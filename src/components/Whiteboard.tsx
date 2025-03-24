@@ -4,7 +4,10 @@ import { Tldraw, useEditor, TLInstanceId, TLRecord, useValue, createTLStore, def
 import '@tldraw/tldraw/tldraw.css';
 import * as Y from 'yjs';
 import { WebrtcProvider } from 'y-webrtc';
-import { TLYjsPresence, TLYjsStore, YKeyValue } from '@tldraw/tlschema/dist/yjs';
+
+// Let's directly use what's available in the current version
+// Instead of importing from a specific path, import from the main package
+import { TLYjsStore } from '@tldraw/tldraw';
 
 interface WhiteboardProps {
   roomId: string;
@@ -30,6 +33,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     doc.getMap('tldraw').set('store', yStore);
     
     // Create a store with the yjs store
+    // Use the TLYjsStore from the main package
     const tlYjsStore = new TLYjsStore({
       store: createTLStore({ 
         shapeUtils: defaultShapeUtils,
@@ -39,14 +43,16 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       yStore,
     });
     
-    // Create a presence (for collaborator cursors)
-    const roomPresence = doc.getMap('presence') as YKeyValue<{ id: TLInstanceId }>;
+    // Handle user presence (for collaborator cursors)
+    // We'll use a simpler approach without TLYjsPresence since it's not available
+    const roomPresence = doc.getMap('presence');
     
-    new TLYjsPresence({ 
-      store: tlYjsStore, 
-      yDoc: doc, 
-      roomPresence,
-      awareness: webrtcProvider.awareness, 
+    // Set up awareness for collaborative features
+    webrtcProvider.awareness.setLocalState({
+      id: Math.random().toString(36).slice(2, 10),
+      user: {
+        name: `User ${Math.floor(Math.random() * 1000)}`,
+      },
     });
     
     setYDoc(doc);
