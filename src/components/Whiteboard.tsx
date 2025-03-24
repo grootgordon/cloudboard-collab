@@ -45,42 +45,55 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Bind the Yjs document to the tldraw store
     const undoManager = new Y.UndoManager(yStore);
     
-    // Sync the store with the Yjs doc
-    const updateYDoc = () => {
+    // Initial sync from Yjs to tldraw
+    const syncFromYjs = () => {
+      // Convert Yjs map entries to TLRecord array
+      const records: TLRecord[] = [];
+      yStore.forEach((value, key) => {
+        if (value && typeof value === 'object') {
+          records.push(value as TLRecord);
+        }
+      });
+      
+      if (records.length > 0) {
+        tlStore.put(records);
+      }
+    };
+    
+    // Initial sync from tldraw to Yjs
+    const syncToYjs = () => {
       const records = tlStore.allRecords();
+      
+      // Delete records from Yjs that no longer exist in tldraw
       yStore.forEach((_, key) => {
         if (!records.find(r => r.id === key)) {
           yStore.delete(key);
         }
       });
       
+      // Add or update records in Yjs
       records.forEach(record => {
-        const existingRecord = yStore.get(record.id);
-        if (!existingRecord || JSON.stringify(existingRecord) !== JSON.stringify(record)) {
-          yStore.set(record.id, record);
-        }
+        yStore.set(record.id, record);
       });
     };
     
     // Initial sync
-    const existingRecords = Array.from(yStore.entries()).map(([id, value]) => value as TLRecord);
-    if (existingRecords.length > 0) {
-      tlStore.put(existingRecords);
-    } else {
-      updateYDoc();
+    syncFromYjs();
+    if (yStore.size === 0) {
+      syncToYjs(); // If Yjs is empty, populate from tldraw
     }
     
-    // Subscribe to changes from the store
-    const unsub = tlStore.listen(() => {
-      updateYDoc();
+    // Subscribe to tldraw store changes
+    const unsubscribeTldraw = tlStore.listen(() => {
+      // Prevent infinite loops by wrapping in a transaction
+      doc.transact(() => {
+        syncToYjs();
+      });
     });
     
-    // Listen for changes from other users
+    // Subscribe to Yjs changes
     yStore.observe(() => {
-      const yRecords = Array.from(yStore.entries()).map(([id, value]) => value as TLRecord);
-      
-      // Update the store with records from other users
-      tlStore.put(yRecords);
+      syncFromYjs();
     });
     
     // Setup for presence (user awareness)
@@ -99,7 +112,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     setIsLoading(false);
     
     return () => {
-      unsub();
+      unsubscribeTldraw();
       hocuspocusProvider.destroy();
       doc.destroy();
     };
