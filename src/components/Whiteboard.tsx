@@ -43,10 +43,12 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
           console.log('Connected to room:', roomId);
         };
         
-        provider.on('sync', handleConnect);
+        // Using the correct event name 'synced' instead of 'sync'
+        provider.on('synced', handleConnect);
         
         return () => {
-          provider.off('sync', handleConnect);
+          // Also use the correct event name here
+          provider.off('synced', handleConnect);
         };
       }
     }, [editor]);
