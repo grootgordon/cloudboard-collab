@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { InfoIcon } from "lucide-react";
 
 const RoomControls = () => {
   const [roomId, setRoomId] = useState('');
@@ -27,6 +29,13 @@ const RoomControls = () => {
         <CardDescription>创建或加入一个白板房间与他人协作</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Alert variant="info" className="bg-blue-50 border-blue-200">
+          <InfoIcon className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-sm text-blue-700">
+            请确保 Hocuspocus 服务器已启动，查看 server/README.md 获取设置说明。
+          </AlertDescription>
+        </Alert>
+        
         <div className="space-y-2">
           <label htmlFor="room-id" className="text-sm font-medium">房间 ID</label>
           <Input

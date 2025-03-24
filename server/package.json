@@ -1,0 +1,14 @@
+
+{
+  "name": "hocuspocus-server",
+  "version": "1.0.0",
+  "description": "Hocuspocus server for Yjs collaboration",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@hocuspocus/server": "^2.9.0",
+    "@hocuspocus/extension-logger": "^2.9.0"
+  }
+}

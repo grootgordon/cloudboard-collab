@@ -4,9 +4,13 @@ import { Tldraw, useEditor, TLRecord, createTLStore, defaultShapeUtils } from '@
 import '@tldraw/tldraw/tldraw.css';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
+import { toast } from 'sonner';
 
 // We need to use the TLStore from tldraw
 import { TLStore } from '@tldraw/tldraw';
+
+// Define the server URL with fallback to local development
+const SERVER_URL = import.meta.env.VITE_HOCUSPOCUS_URL || 'ws://localhost:1234';
 
 interface WhiteboardProps {
   roomId: string;
@@ -17,6 +21,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const [yDoc, setYDoc] = useState<Y.Doc | null>(null);
   const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
   const [store, setStore] = useState<TLStore | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
   
   // Initialize Yjs document and Hocuspocus provider
   useEffect(() => {
@@ -26,11 +31,33 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     
     // Create a Hocuspocus provider
     const hocuspocusProvider = new HocuspocusProvider({
-      url: 'wss://demos.yjs.dev', // Using public demo server, replace with your own server in production
+      url: SERVER_URL,
       name: roomId,
       document: doc,
       onStatus: ({ status }) => {
         console.log('Connection status:', status);
+        setConnectionStatus(status);
+        
+        if (status === 'connected') {
+          toast.success('Connected to collaboration server');
+        } else if (status === 'disconnected') {
+          toast.error('Disconnected from collaboration server');
+        }
+      },
+      onConnect: () => {
+        console.log('Connected to Hocuspocus server');
+        toast.success('Connected to collaboration server');
+      },
+      onDisconnect: () => {
+        console.log('Disconnected from Hocuspocus server');
+        toast.error('Disconnected from collaboration server');
+      },
+      onClose: () => {
+        console.log('Connection closed');
+      },
+      onError: (error) => {
+        console.error('Connection error:', error);
+        toast.error(`Connection error: ${error.message || 'Unknown error'}`);
       },
     });
     
@@ -148,6 +175,11 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   
   return (
     <div className="h-screen w-full">
+      {connectionStatus !== 'connected' && (
+        <div className="fixed top-4 right-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 z-50">
+          {connectionStatus === 'connecting' ? 'Connecting to server...' : 'Disconnected from server'}
+        </div>
+      )}
       {store && (
         <Tldraw store={store}>
           <EditorComponent />
