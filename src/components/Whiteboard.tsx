@@ -3,9 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { Tldraw, useEditor, TLRecord, createTLStore, defaultShapeUtils } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import * as Y from 'yjs';
-import { WebrtcProvider } from 'y-webrtc';
+import { HocuspocusProvider } from '@hocuspocus/provider';
 
-// We need to use the TLStore from tldraw instead of TLYjsStore
+// We need to use the TLStore from tldraw
 import { TLStore } from '@tldraw/tldraw';
 
 interface WhiteboardProps {
@@ -15,16 +15,23 @@ interface WhiteboardProps {
 const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [yDoc, setYDoc] = useState<Y.Doc | null>(null);
-  const [provider, setProvider] = useState<WebrtcProvider | null>(null);
+  const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
   const [store, setStore] = useState<TLStore | null>(null);
   
-  // Initialize Yjs document and WebRTC provider
+  // Initialize Yjs document and Hocuspocus provider
   useEffect(() => {
     if (!roomId) return;
     
     const doc = new Y.Doc();
-    const webrtcProvider = new WebrtcProvider(roomId, doc, {
-      signaling: ['wss://y-webrtc-signaling-eu.herokuapp.com', 'wss://y-webrtc-signaling-us.herokuapp.com'],
+    
+    // Create a Hocuspocus provider
+    const hocuspocusProvider = new HocuspocusProvider({
+      url: 'wss://demos.yjs.dev', // Using public demo server, replace with your own server in production
+      name: roomId,
+      document: doc,
+      onStatus: ({ status }) => {
+        console.log('Connection status:', status);
+      },
     });
     
     // Create a Yjs-based store for tldraw
@@ -36,7 +43,6 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     });
     
     // Bind the Yjs document to the tldraw store
-    // This creates a binding between the two
     const undoManager = new Y.UndoManager(yStore);
     
     // Sync the store with the Yjs doc
@@ -69,8 +75,17 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       updateYDoc();
     });
     
-    // Set up awareness for collaborative features
-    webrtcProvider.awareness.setLocalState({
+    // Listen for changes from other users
+    yStore.observe(() => {
+      const yRecords = Array.from(yStore.entries()).map(([id, value]) => value as TLRecord);
+      
+      // Update the store with records from other users
+      tlStore.put(yRecords);
+    });
+    
+    // Setup for presence (user awareness)
+    const awareness = hocuspocusProvider.awareness;
+    awareness.setLocalState({
       id: Math.random().toString(36).slice(2, 10),
       user: {
         name: `User ${Math.floor(Math.random() * 1000)}`,
@@ -79,13 +94,13 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     });
     
     setYDoc(doc);
-    setProvider(webrtcProvider);
+    setProvider(hocuspocusProvider);
     setStore(tlStore);
     setIsLoading(false);
     
     return () => {
       unsub();
-      webrtcProvider.disconnect();
+      hocuspocusProvider.destroy();
       doc.destroy();
     };
   }, [roomId]);
@@ -95,17 +110,18 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     
     useEffect(() => {
       if (editor && provider) {
-        // Handle connection status
-        const handleConnect = () => {
-          console.log('Connected to room:', roomId);
+        // Log connected users
+        const awareness = provider.awareness;
+        
+        const handleAwarenessUpdate = () => {
+          const states = Array.from(awareness.getStates().values());
+          console.log(`Connected users: ${states.length}`, states);
         };
         
-        // Using the correct event name 'synced' instead of 'sync'
-        provider.on('synced', handleConnect);
+        awareness.on('update', handleAwarenessUpdate);
         
         return () => {
-          // Also use the correct event name here
-          provider.off('synced', handleConnect);
+          awareness.off('update', handleAwarenessUpdate);
         };
       }
     }, [editor]);
