@@ -1,13 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
-import { Tldraw, useEditor, TLInstanceId, TLRecord, useValue, createTLStore, defaultShapeUtils } from '@tldraw/tldraw';
+import { Tldraw, useEditor, TLRecord, createTLStore, defaultShapeUtils } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import * as Y from 'yjs';
 import { WebrtcProvider } from 'y-webrtc';
 
-// Let's directly use what's available in the current version
-// Instead of importing from a specific path, import from the main package
-import { TLYjsStore } from '@tldraw/tldraw';
+// We need to use the TLStore from tldraw instead of TLYjsStore
+import { TLStore } from '@tldraw/tldraw';
 
 interface WhiteboardProps {
   roomId: string;
@@ -17,7 +16,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [yDoc, setYDoc] = useState<Y.Doc | null>(null);
   const [provider, setProvider] = useState<WebrtcProvider | null>(null);
-  const [store, setStore] = useState<TLYjsStore | null>(null);
+  const [store, setStore] = useState<TLStore | null>(null);
   
   // Initialize Yjs document and WebRTC provider
   useEffect(() => {
@@ -29,38 +28,63 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     });
     
     // Create a Yjs-based store for tldraw
-    const yStore = new Y.Map<TLRecord>();
-    doc.getMap('tldraw').set('store', yStore);
+    const yStore = doc.getMap('tldraw');
     
-    // Create a store with the yjs store
-    // Use the TLYjsStore from the main package
-    const tlYjsStore = new TLYjsStore({
-      store: createTLStore({ 
-        shapeUtils: defaultShapeUtils,
-      }),
-      yDoc: doc,
-      storeKey: 'tldraw',
-      yStore,
+    // Create the tldraw store
+    const tlStore = createTLStore({ 
+      shapeUtils: defaultShapeUtils,
     });
     
-    // Handle user presence (for collaborator cursors)
-    // We'll use a simpler approach without TLYjsPresence since it's not available
-    const roomPresence = doc.getMap('presence');
+    // Bind the Yjs document to the tldraw store
+    // This creates a binding between the two
+    const undoManager = new Y.UndoManager(yStore);
+    
+    // Sync the store with the Yjs doc
+    const updateYDoc = () => {
+      const records = tlStore.allRecords();
+      yStore.forEach((_, key) => {
+        if (!records.find(r => r.id === key)) {
+          yStore.delete(key);
+        }
+      });
+      
+      records.forEach(record => {
+        const existingRecord = yStore.get(record.id);
+        if (!existingRecord || JSON.stringify(existingRecord) !== JSON.stringify(record)) {
+          yStore.set(record.id, record);
+        }
+      });
+    };
+    
+    // Initial sync
+    const existingRecords = Array.from(yStore.entries()).map(([id, value]) => value as TLRecord);
+    if (existingRecords.length > 0) {
+      tlStore.put(existingRecords);
+    } else {
+      updateYDoc();
+    }
+    
+    // Subscribe to changes from the store
+    const unsub = tlStore.listen(() => {
+      updateYDoc();
+    });
     
     // Set up awareness for collaborative features
     webrtcProvider.awareness.setLocalState({
       id: Math.random().toString(36).slice(2, 10),
       user: {
         name: `User ${Math.floor(Math.random() * 1000)}`,
+        color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
       },
     });
     
     setYDoc(doc);
     setProvider(webrtcProvider);
-    setStore(tlYjsStore);
+    setStore(tlStore);
     setIsLoading(false);
     
     return () => {
+      unsub();
       webrtcProvider.disconnect();
       doc.destroy();
     };
