@@ -22,12 +22,14 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const [provider, setProvider] = useState<HocuspocusProvider | null>(null);
   const [store, setStore] = useState<TLStore | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   
   // Initialize Yjs document and Hocuspocus provider
   useEffect(() => {
     if (!roomId) return;
     
     const doc = new Y.Doc();
+    console.log(`Connecting to Hocuspocus server at ${SERVER_URL} for room ${roomId}`);
     
     // Create a Hocuspocus provider
     const hocuspocusProvider = new HocuspocusProvider({
@@ -40,8 +42,17 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
         
         if (status === 'connected') {
           toast.success('Connected to collaboration server');
+          setConnectionAttempts(0);
         } else if (status === 'disconnected') {
           toast.error('Disconnected from collaboration server');
+          
+          // If we've made less than 3 attempts, try to reconnect
+          if (connectionAttempts < 3) {
+            setConnectionAttempts(prev => prev + 1);
+            toast.info(`Attempting to reconnect (${connectionAttempts + 1}/3)...`);
+          } else {
+            toast.error('Could not connect to server. Please check if the server is running.');
+          }
         }
       },
       onConnect: () => {
@@ -145,7 +156,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       hocuspocusProvider.destroy();
       doc.destroy();
     };
-  }, [roomId]);
+  }, [roomId, connectionAttempts]);
   
   const EditorComponent = () => {
     const editor = useEditor();
@@ -178,8 +189,8 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   return (
     <div className="h-screen w-full">
       {connectionStatus !== 'connected' && (
-        <div className="fixed top-4 right-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 z-50">
-          {connectionStatus === 'connecting' ? 'Connecting to server...' : 'Disconnected from server'}
+        <div className="fixed top-4 right-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 z-50 rounded shadow-md">
+          {connectionStatus === 'connecting' ? 'Connecting to server...' : 'Disconnected from server. Check if the Hocuspocus server is running.'}
         </div>
       )}
       {store && (
