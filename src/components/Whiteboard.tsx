@@ -55,10 +55,12 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       onClose: () => {
         console.log('Connection closed');
       },
-      onError: (error) => {
-        console.error('Connection error:', error);
-        toast.error(`Connection error: ${error.message || 'Unknown error'}`);
-      },
+    });
+    
+    // Handle errors manually
+    hocuspocusProvider.on('error', (error) => {
+      console.error('Connection error:', error);
+      toast.error(`Connection error: ${error.message || 'Unknown error'}`);
     });
     
     // Create a Yjs-based store for tldraw

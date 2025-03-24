@@ -29,7 +29,7 @@ const RoomControls = () => {
         <CardDescription>创建或加入一个白板房间与他人协作</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Alert variant="info" className="bg-blue-50 border-blue-200">
+        <Alert className="bg-blue-50 border-blue-200">
           <InfoIcon className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-sm text-blue-700">
             请确保 Hocuspocus 服务器已启动，查看 server/README.md 获取设置说明。
