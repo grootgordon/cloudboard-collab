@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Tldraw, useEditor, TLRecord, createTLStore, defaultShapeUtils } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
@@ -208,9 +207,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      editor.setStyleForNextShapes({ 
-        color 
-      });
+      editor.setStyleForNextShapes("color", color);
     };
     
     // Handle undo/redo
