@@ -67,13 +67,6 @@ const EditorComponent: React.FC<EditorComponentProps> = ({ provider, yDoc }) => 
         isGridMode: true,
       });
       
-      // Disable all navigation tools and prevent panning
-      editor.getInitialMetadata();
-      
-      // Override the editor's viewport bounds to prevent any movement
-      const viewport = editor.getViewportPageBounds();
-      editor.setViewportPageBounds(viewport);
-
       // Additional measures to restrict movement
       const preventDefaultWheelBehavior = (e: WheelEvent) => {
         if (e.ctrlKey || e.metaKey) {
@@ -88,22 +81,15 @@ const EditorComponent: React.FC<EditorComponentProps> = ({ provider, yDoc }) => 
       }, 100);
 
       // Disable gestures and pan/zoom using TLDraw's preferences
-      // @ts-ignore - Accessing internal properties
-      if (editor.user && editor.user.updateUserPreferences) {
+      if (editor.user) {
         editor.user.updateUserPreferences({
-          isDebugMode: false,
           isDarkMode: false,
-          isKeyboardShortcutsDialogOpen: false,
-          isFocusMode: false,
           isSnapMode: true,
           nudgeDistanceSmall: 1,
           nudgeDistanceLarge: 10,
           isDarkPaletteMode: false,
           keepStyleMenuOpen: false,
-          isReadonlyMode: false,
           isToolLocked: true,  // Lock the current tool
-          isCLI: false,
-          disableAssetCache: false
         });
       }
       
