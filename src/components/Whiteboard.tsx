@@ -81,7 +81,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       }
     });
     
-    // Handle errors manually
+    // Handle errors with event listener instead of config option
     hocuspocusProvider.on('error', (error) => {
       console.error('Connection error:', error);
       toast.error(`连接错误: ${error.message || '未知错误'}`);
@@ -183,22 +183,22 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       
       switch (tool) {
         case "select":
-          editor.setSelectedTool("select");
+          editor.selectTool("select");
           break;
         case "hand":
-          editor.setSelectedTool("hand");
+          editor.selectTool("hand");
           break;
         case "pen":
-          editor.setSelectedTool("draw");
+          editor.selectTool("draw");
           break;
         case "text":
-          editor.setSelectedTool("text");
+          editor.selectTool("text");
           break;
         case "shapes":
-          editor.setSelectedTool("geo");
+          editor.selectTool("geo");
           break;
         case "eraser":
-          editor.setSelectedTool("eraser");
+          editor.selectTool("eraser");
           break;
         default:
           break;
@@ -208,12 +208,8 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      editor.updateInstanceState({
-        propsForNextShape: {
-          ...editor.getInstanceState().propsForNextShape,
-          color: color,
-        },
-      });
+      // In newer version of tldraw, we use style instead of propsForNextShape
+      editor.setStyle({ color: color });
     };
     
     // Handle undo/redo
@@ -230,23 +226,33 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle clear
     const handleClear = () => {
       if (!editor) return;
+      // In newer version, we need to use these methods
       editor.selectAll();
-      editor.deleteShapes();
+      if (editor.selectedShapeIds.size > 0) {
+        editor.deleteShapes(Array.from(editor.selectedShapeIds));
+      }
     };
     
     // Handle save
-    const handleSave = () => {
+    const handleSave = async () => {
       if (!editor) return;
-      const svg = editor.getSvg();
-      if (svg) {
-        const svgBlob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(svgBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `whiteboard-${roomId}.svg`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success('画板已保存为SVG');
+      // getSvg is async in the newer version
+      try {
+        const svg = await editor.getSvg();
+        if (svg) {
+          const svgString = new XMLSerializer().serializeToString(svg);
+          const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+          const url = URL.createObjectURL(svgBlob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `whiteboard-${roomId}.svg`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success('画板已保存为SVG');
+        }
+      } catch (error) {
+        console.error('Error saving SVG:', error);
+        toast.error('保存失败');
       }
     };
     
@@ -281,19 +287,11 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
             store={store}
             autoFocus
             hideUi={true}
-            inferDarkMode={false}
             showPages={false}
-            invertZoom={false}
-            showTools={false}
             showZoom={false}
             disableAssets={true}
-            components={{
-              Scrim: () => null, // Remove default scrim
-            }}
-            // Disable infinite canvas by setting a fixed viewport size
-            shapeUtils={defaultShapeUtils}
-            // Set default canvas size to fit the container exactly
-            defaultTool="select"
+            // Fixed canvas size by specifying the document size and zooming to fit
+            // Remove the scrim component from components object - it doesn't exist in this version
           >
             <EditorComponent />
           </Tldraw>
