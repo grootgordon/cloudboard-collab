@@ -208,8 +208,8 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      // Fix: Pass the property name and value as separate arguments
-      editor.setStyleForNextShapes("color", color);
+      // Fix: Use the correct format for the style value in tldraw v3.11.0
+      editor.setStyleForNextShapes({ color });
     };
     
     // Handle undo/redo
