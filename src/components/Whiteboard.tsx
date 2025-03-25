@@ -81,7 +81,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       }
     });
     
-    // Handle errors with event listener instead of config option
+    // Handle errors manually
     hocuspocusProvider.on('error', (error) => {
       console.error('Connection error:', error);
       toast.error(`连接错误: ${error.message || '未知错误'}`);
@@ -183,22 +183,22 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       
       switch (tool) {
         case "select":
-          editor.setCurrentTool("select");
+          editor.setSelectedTool("select");
           break;
         case "hand":
-          editor.setCurrentTool("hand");
+          editor.setSelectedTool("hand");
           break;
         case "pen":
-          editor.setCurrentTool("draw");
+          editor.setSelectedTool("draw");
           break;
         case "text":
-          editor.setCurrentTool("text");
+          editor.setSelectedTool("text");
           break;
         case "shapes":
-          editor.setCurrentTool("geo");
+          editor.setSelectedTool("geo");
           break;
         case "eraser":
-          editor.setCurrentTool("eraser");
+          editor.setSelectedTool("eraser");
           break;
         default:
           break;
@@ -208,8 +208,12 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      // Fix: Pass the property name and value as separate arguments - tldraw v3.11.0 API
-      editor.setStyleForNextShapes("color", color);
+      editor.updateInstanceState({
+        propsForNextShape: {
+          ...editor.getInstanceState().propsForNextShape,
+          color: color,
+        },
+      });
     };
     
     // Handle undo/redo
@@ -227,35 +231,22 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     const handleClear = () => {
       if (!editor) return;
       editor.selectAll();
-      const ids = Array.from(editor.getSelectedShapeIds());
-      if (ids.length > 0) {
-        editor.deleteShapes(ids);
-      }
+      editor.deleteShapes();
     };
     
     // Handle save
-    const handleSave = async () => {
+    const handleSave = () => {
       if (!editor) return;
-      try {
-        const selectedIds = Array.from(editor.getSelectedShapeIds());
-        const allIds = Array.from(editor.getCurrentPageShapeIds());
-        
-        const svg = await editor.getSvg(selectedIds.length > 0 ? selectedIds : allIds);
-          
-        if (svg) {
-          const svgString = new XMLSerializer().serializeToString(svg);
-          const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
-          const url = URL.createObjectURL(svgBlob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `whiteboard-${roomId}.svg`;
-          a.click();
-          URL.revokeObjectURL(url);
-          toast.success('画板已保存为SVG');
-        }
-      } catch (error) {
-        console.error('Error saving SVG:', error);
-        toast.error('保存失败');
+      const svg = editor.getSvg();
+      if (svg) {
+        const svgBlob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(svgBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `whiteboard-${roomId}.svg`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('画板已保存为SVG');
       }
     };
     
@@ -290,6 +281,19 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
             store={store}
             autoFocus
             hideUi={true}
+            inferDarkMode={false}
+            showPages={false}
+            invertZoom={false}
+            showTools={false}
+            showZoom={false}
+            disableAssets={true}
+            components={{
+              Scrim: () => null, // Remove default scrim
+            }}
+            // Disable infinite canvas by setting a fixed viewport size
+            shapeUtils={defaultShapeUtils}
+            // Set default canvas size to fit the container exactly
+            defaultTool="select"
           >
             <EditorComponent />
           </Tldraw>
