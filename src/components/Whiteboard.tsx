@@ -183,22 +183,22 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       
       switch (tool) {
         case "select":
-          editor.tool("select");
+          editor.setSelectedTool("select");
           break;
         case "hand":
-          editor.tool("hand");
+          editor.setSelectedTool("hand");
           break;
         case "pen":
-          editor.tool("draw");
+          editor.setSelectedTool("draw");
           break;
         case "text":
-          editor.tool("text");
+          editor.setSelectedTool("text");
           break;
         case "shapes":
-          editor.tool("geo");
+          editor.setSelectedTool("geo");
           break;
         case "eraser":
-          editor.tool("eraser");
+          editor.setSelectedTool("eraser");
           break;
         default:
           break;
@@ -208,7 +208,12 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      editor.style({ color: color });
+      editor.updateInstanceState({ 
+        stylesForNextShape: { 
+          ...editor.getInstanceState().stylesForNextShape,
+          color 
+        } 
+      });
     };
     
     // Handle undo/redo
@@ -226,7 +231,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     const handleClear = () => {
       if (!editor) return;
       editor.selectAll();
-      const ids = editor.selectedShapeIds;
+      const ids = Array.from(editor.getSelectedShapeIds());
       if (ids.length > 0) {
         editor.deleteShapes(ids);
       }
@@ -236,9 +241,10 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     const handleSave = async () => {
       if (!editor) return;
       try {
-        const svg = await editor.exportSvg(editor.selectedShapeIds.length > 0 
-          ? editor.selectedShapeIds 
-          : editor.shapes.map(shape => shape.id));
+        const selectedIds = Array.from(editor.getSelectedShapeIds());
+        const allIds = editor.getShapeIds();
+        
+        const svg = await editor.getSvg(selectedIds.length > 0 ? selectedIds : allIds);
           
         if (svg) {
           const svgString = new XMLSerializer().serializeToString(svg);
