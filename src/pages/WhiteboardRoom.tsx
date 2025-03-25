@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import Whiteboard from '@/components/Whiteboard';
+import Whiteboard from '@/components/whiteboard/Whiteboard';
 
 const WhiteboardRoom = () => {
   const { roomId } = useParams<{ roomId: string }>();
