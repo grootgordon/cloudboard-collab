@@ -23,6 +23,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const [store, setStore] = useState<TLStore | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [cursors, setCursors] = useState<Record<string, { x: number, y: number, name: string, color: string }>>({});
   
   // Initialize Yjs document and Hocuspocus provider
   useEffect(() => {
@@ -136,14 +137,33 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       syncFromYjs();
     });
     
+    // Set up cursor synchronization
+    const cursorsMap = doc.getMap('cursors');
+    
+    // Initialize random user for this session
+    const userId = Math.random().toString(36).slice(2, 10);
+    const userColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`;
+    const userName = `User ${Math.floor(Math.random() * 1000)}`;
+    
     // Setup for presence (user awareness)
     const awareness = hocuspocusProvider.awareness;
     awareness.setLocalState({
-      id: Math.random().toString(36).slice(2, 10),
+      id: userId,
       user: {
-        name: `User ${Math.floor(Math.random() * 1000)}`,
-        color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+        name: userName,
+        color: userColor,
       },
+    });
+    
+    // Observe cursor changes
+    cursorsMap.observe(() => {
+      const currentCursors: Record<string, any> = {};
+      cursorsMap.forEach((value, key) => {
+        if (key !== userId) { // Don't show our own cursor
+          currentCursors[key] = value;
+        }
+      });
+      setCursors(currentCursors);
     });
     
     setYDoc(doc);
@@ -162,10 +182,57 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     const editor = useEditor();
     
     useEffect(() => {
-      if (editor && provider) {
-        // Log connected users
+      if (editor && provider && yDoc) {
+        // Get the cursors map from the Yjs document
+        const cursorsMap = yDoc.getMap('cursors');
+        // Get user info from the awareness
         const awareness = provider.awareness;
+        const myState = awareness.getLocalState();
+        const userId = myState?.id;
         
+        if (!userId) return;
+        
+        // Track pointer movements
+        const handlePointerMove = (event: PointerEvent) => {
+          // Get editor container bounds
+          const bounds = editor.getContainer().getBoundingClientRect();
+          
+          // Calculate relative position within the canvas
+          const x = (event.clientX - bounds.left) / bounds.width;
+          const y = (event.clientY - bounds.top) / bounds.height;
+          
+          // Update cursor position in Yjs
+          cursorsMap.set(userId, {
+            x,
+            y,
+            name: myState.user.name,
+            color: myState.user.color,
+            timestamp: Date.now(),
+          });
+        };
+        
+        // Clean up old cursors (idle for more than 5 seconds)
+        const cleanupInterval = setInterval(() => {
+          const now = Date.now();
+          cursorsMap.forEach((value, key) => {
+            if (value.timestamp && now - value.timestamp > 5000) {
+              cursorsMap.delete(key);
+            }
+          });
+        }, 5000);
+        
+        // Add event listeners
+        const container = editor.getContainer();
+        container.addEventListener('pointermove', handlePointerMove);
+        
+        // Disable infinite canvas
+        editor.setCamera({ x: 0, y: 0, z: 1 });
+        editor.updateInstanceState({ 
+          canMoveCamera: false,
+          isGridMode: true,
+        });
+        
+        // Log connected users
         const handleAwarenessUpdate = () => {
           const states = Array.from(awareness.getStates().values());
           console.log(`Connected users: ${states.length}`, states);
@@ -174,10 +241,12 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
         awareness.on('update', handleAwarenessUpdate);
         
         return () => {
+          container.removeEventListener('pointermove', handlePointerMove);
+          clearInterval(cleanupInterval);
           awareness.off('update', handleAwarenessUpdate);
         };
       }
-    }, [editor]);
+    }, [editor, provider, yDoc]);
     
     return null;
   };
@@ -187,15 +256,50 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   }
   
   return (
-    <div className="h-screen w-full">
+    <div className="h-screen w-full relative">
       {connectionStatus !== 'connected' && (
         <div className="fixed top-4 right-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 z-50 rounded shadow-md">
           {connectionStatus === 'connecting' ? 'Connecting to server...' : 'Disconnected from server. Check if the Hocuspocus server is running.'}
         </div>
       )}
+      
+      {/* Remote Cursors */}
+      {Object.entries(cursors).map(([userId, cursor]) => (
+        <div 
+          key={userId}
+          className="absolute pointer-events-none z-50 flex flex-col items-center"
+          style={{
+            left: `${cursor.x * 100}%`,
+            top: `${cursor.y * 100}%`,
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
+          <div 
+            className="w-4 h-4 rounded-full animate-pulse"
+            style={{ backgroundColor: cursor.color }}
+          />
+          <span 
+            className="mt-1 px-2 py-1 rounded text-xs text-white"
+            style={{ backgroundColor: cursor.color }}
+          >
+            {cursor.name}
+          </span>
+        </div>
+      ))}
+      
       {store && (
-        <Tldraw store={store}>
-          <EditorComponent />
+        <Tldraw
+          store={store}
+          hideUi={false}
+          components={{
+            // Override the context menu component to disable zoom and pan
+            InFrontOfTheCanvas: () => (
+              <>
+                <EditorComponent />
+              </>
+            ),
+          }}
+        >
         </Tldraw>
       )}
     </div>
