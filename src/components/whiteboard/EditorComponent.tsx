@@ -83,11 +83,9 @@ const EditorComponent: React.FC<EditorComponentProps> = ({ provider, yDoc }) => 
       // Disable gestures and pan/zoom using TLDraw's preferences
       if (editor.user) {
         editor.user.updateUserPreferences({
-          isDarkMode: false,
           isSnapMode: true,
           nudgeDistanceSmall: 1,
           nudgeDistanceLarge: 10,
-          isDarkPaletteMode: false,
           keepStyleMenuOpen: false,
           isToolLocked: true,  // Lock the current tool
         });
