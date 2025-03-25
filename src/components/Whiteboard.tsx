@@ -183,22 +183,22 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       
       switch (tool) {
         case "select":
-          editor.setActiveTool("select");
+          editor.tool("select");
           break;
         case "hand":
-          editor.setActiveTool("hand");
+          editor.tool("hand");
           break;
         case "pen":
-          editor.setActiveTool("draw");
+          editor.tool("draw");
           break;
         case "text":
-          editor.setActiveTool("text");
+          editor.tool("text");
           break;
         case "shapes":
-          editor.setActiveTool("geo");
+          editor.tool("geo");
           break;
         case "eraser":
-          editor.setActiveTool("eraser");
+          editor.tool("eraser");
           break;
         default:
           break;
@@ -208,8 +208,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      // In newer version of tldraw, we need to use stroke/fill properties
-      editor.setProp("color", color);
+      editor.style({ color: color });
     };
     
     // Handle undo/redo
@@ -226,9 +225,8 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle clear
     const handleClear = () => {
       if (!editor) return;
-      // In newer version, we need to use these methods
       editor.selectAll();
-      const ids = Array.from(editor.getSelectedShapeIds());
+      const ids = editor.selectedShapeIds;
       if (ids.length > 0) {
         editor.deleteShapes(ids);
       }
@@ -237,9 +235,11 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle save
     const handleSave = async () => {
       if (!editor) return;
-      // getSvg is async in the newer version
       try {
-        const svg = await editor.getSvg(Array.from(editor.getShapeIds()));
+        const svg = await editor.exportSvg(editor.selectedShapeIds.length > 0 
+          ? editor.selectedShapeIds 
+          : editor.shapes.map(shape => shape.id));
+          
         if (svg) {
           const svgString = new XMLSerializer().serializeToString(svg);
           const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
@@ -288,7 +288,6 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
             store={store}
             autoFocus
             hideUi={true}
-            disableAssets={true}
           >
             <EditorComponent />
           </Tldraw>
