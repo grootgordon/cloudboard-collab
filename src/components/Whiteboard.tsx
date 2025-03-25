@@ -183,22 +183,22 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       
       switch (tool) {
         case "select":
-          editor.selectTool("select");
+          editor.setActiveTool("select");
           break;
         case "hand":
-          editor.selectTool("hand");
+          editor.setActiveTool("hand");
           break;
         case "pen":
-          editor.selectTool("draw");
+          editor.setActiveTool("draw");
           break;
         case "text":
-          editor.selectTool("text");
+          editor.setActiveTool("text");
           break;
         case "shapes":
-          editor.selectTool("geo");
+          editor.setActiveTool("geo");
           break;
         case "eraser":
-          editor.selectTool("eraser");
+          editor.setActiveTool("eraser");
           break;
         default:
           break;
@@ -208,8 +208,8 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      // In newer version of tldraw, we use style instead of propsForNextShape
-      editor.setStyle({ color: color });
+      // In newer version of tldraw, we need to use stroke/fill properties
+      editor.setProp("color", color);
     };
     
     // Handle undo/redo
@@ -228,8 +228,9 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       if (!editor) return;
       // In newer version, we need to use these methods
       editor.selectAll();
-      if (editor.selectedShapeIds.size > 0) {
-        editor.deleteShapes(Array.from(editor.selectedShapeIds));
+      const ids = Array.from(editor.getSelectedShapeIds());
+      if (ids.length > 0) {
+        editor.deleteShapes(ids);
       }
     };
     
@@ -238,7 +239,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       if (!editor) return;
       // getSvg is async in the newer version
       try {
-        const svg = await editor.getSvg();
+        const svg = await editor.getSvg(Array.from(editor.getShapeIds()));
         if (svg) {
           const svgString = new XMLSerializer().serializeToString(svg);
           const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
@@ -287,11 +288,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
             store={store}
             autoFocus
             hideUi={true}
-            showPages={false}
-            showZoom={false}
             disableAssets={true}
-            // Fixed canvas size by specifying the document size and zooming to fit
-            // Remove the scrim component from components object - it doesn't exist in this version
           >
             <EditorComponent />
           </Tldraw>
