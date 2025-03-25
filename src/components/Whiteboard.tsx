@@ -1,10 +1,12 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Tldraw, useEditor, TLRecord, createTLStore, defaultShapeUtils } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import { toast } from 'sonner';
+import WhiteboardToolbar from './WhiteboardToolbar';
+import CursorPresence from './CursorPresence';
 
 // We need to use the TLStore from tldraw
 import { TLStore } from '@tldraw/tldraw';
@@ -23,6 +25,26 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const [store, setStore] = useState<TLStore | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  
+  // Get container size
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight
+        });
+      }
+    };
+    
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
   
   // Initialize Yjs document and Hocuspocus provider
   useEffect(() => {
@@ -41,37 +63,28 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
         setConnectionStatus(status);
         
         if (status === 'connected') {
-          toast.success('Connected to collaboration server');
+          toast.success('连接到协作服务器成功');
           setConnectionAttempts(0);
         } else if (status === 'disconnected') {
-          toast.error('Disconnected from collaboration server');
+          toast.error('与协作服务器连接断开');
           
           // If we've made less than 3 attempts, try to reconnect
           if (connectionAttempts < 3) {
             setConnectionAttempts(prev => prev + 1);
-            toast.info(`Attempting to reconnect (${connectionAttempts + 1}/3)...`);
+            toast('正在尝试重新连接...', {
+              description: `尝试 ${connectionAttempts + 1}/3`
+            });
           } else {
-            toast.error('Could not connect to server. Please check if the server is running.');
+            toast.error('无法连接到服务器，请检查服务器是否运行');
           }
         }
-      },
-      onConnect: () => {
-        console.log('Connected to Hocuspocus server');
-        toast.success('Connected to collaboration server');
-      },
-      onDisconnect: () => {
-        console.log('Disconnected from Hocuspocus server');
-        toast.error('Disconnected from collaboration server');
-      },
-      onClose: () => {
-        console.log('Connection closed');
-      },
+      }
     });
     
     // Handle errors manually
     hocuspocusProvider.on('error', (error) => {
       console.error('Connection error:', error);
-      toast.error(`Connection error: ${error.message || 'Unknown error'}`);
+      toast.error(`连接错误: ${error.message || '未知错误'}`);
     });
     
     // Create a Yjs-based store for tldraw
@@ -138,11 +151,14 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     
     // Setup for presence (user awareness)
     const awareness = hocuspocusProvider.awareness;
+    const randomColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`;
+    const randomId = Math.random().toString(36).slice(2, 10);
+    
     awareness.setLocalState({
-      id: Math.random().toString(36).slice(2, 10),
+      id: randomId,
       user: {
-        name: `User ${Math.floor(Math.random() * 1000)}`,
-        color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+        name: `用户 ${Math.floor(Math.random() * 1000)}`,
+        color: randomColor,
       },
     });
     
@@ -161,42 +177,128 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const EditorComponent = () => {
     const editor = useEditor();
     
-    useEffect(() => {
-      if (editor && provider) {
-        // Log connected users
-        const awareness = provider.awareness;
-        
-        const handleAwarenessUpdate = () => {
-          const states = Array.from(awareness.getStates().values());
-          console.log(`Connected users: ${states.length}`, states);
-        };
-        
-        awareness.on('update', handleAwarenessUpdate);
-        
-        return () => {
-          awareness.off('update', handleAwarenessUpdate);
-        };
+    // Handle tool changes from our custom toolbar
+    const handleToolChange = (tool: string) => {
+      if (!editor) return;
+      
+      switch (tool) {
+        case "select":
+          editor.setSelectedTool("select");
+          break;
+        case "hand":
+          editor.setSelectedTool("hand");
+          break;
+        case "pen":
+          editor.setSelectedTool("draw");
+          break;
+        case "text":
+          editor.setSelectedTool("text");
+          break;
+        case "shapes":
+          editor.setSelectedTool("geo");
+          break;
+        case "eraser":
+          editor.setSelectedTool("eraser");
+          break;
+        default:
+          break;
       }
-    }, [editor]);
+    };
     
-    return null;
+    // Handle color changes
+    const handleColorChange = (color: string) => {
+      if (!editor) return;
+      editor.updateInstanceState({
+        propsForNextShape: {
+          ...editor.getInstanceState().propsForNextShape,
+          color: color,
+        },
+      });
+    };
+    
+    // Handle undo/redo
+    const handleUndo = () => {
+      if (!editor) return;
+      editor.undo();
+    };
+    
+    const handleRedo = () => {
+      if (!editor) return;
+      editor.redo();
+    };
+    
+    // Handle clear
+    const handleClear = () => {
+      if (!editor) return;
+      editor.selectAll();
+      editor.deleteShapes();
+    };
+    
+    // Handle save
+    const handleSave = () => {
+      if (!editor) return;
+      const svg = editor.getSvg();
+      if (svg) {
+        const svgBlob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(svgBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `whiteboard-${roomId}.svg`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('画板已保存为SVG');
+      }
+    };
+    
+    return (
+      <>
+        <WhiteboardToolbar 
+          onToolChange={handleToolChange}
+          onColorChange={handleColorChange}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onClear={handleClear}
+          onSave={handleSave}
+        />
+      </>
+    );
   };
   
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading whiteboard...</div>;
+    return <div className="flex items-center justify-center h-screen">加载白板中...</div>;
   }
   
   return (
-    <div className="h-screen w-full">
+    <div ref={containerRef} className="h-screen w-full relative">
       {connectionStatus !== 'connected' && (
         <div className="fixed top-4 right-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 z-50 rounded shadow-md">
-          {connectionStatus === 'connecting' ? 'Connecting to server...' : 'Disconnected from server. Check if the Hocuspocus server is running.'}
+          {connectionStatus === 'connecting' ? '正在连接服务器...' : '未连接到服务器。请检查 Hocuspocus 服务器是否正在运行。'}
         </div>
       )}
       {store && (
-        <Tldraw store={store}>
-          <EditorComponent />
-        </Tldraw>
+        <div className="relative h-full">
+          <Tldraw 
+            store={store}
+            autoFocus
+            hideUi={true}
+            inferDarkMode={false}
+            showPages={false}
+            invertZoom={false}
+            showTools={false}
+            showZoom={false}
+            disableAssets={true}
+            components={{
+              Scrim: () => null, // Remove default scrim
+            }}
+            // Disable infinite canvas by setting a fixed viewport size
+            shapeUtils={defaultShapeUtils}
+            // Set default canvas size to fit the container exactly
+            defaultTool="select"
+          >
+            <EditorComponent />
+          </Tldraw>
+          {provider && <CursorPresence provider={provider} roomId={roomId} />}
+        </div>
       )}
     </div>
   );
