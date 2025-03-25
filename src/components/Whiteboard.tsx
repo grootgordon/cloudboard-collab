@@ -183,22 +183,22 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       
       switch (tool) {
         case "select":
-          editor.setSelectedTool("select");
+          editor.setCurrentTool("select");
           break;
         case "hand":
-          editor.setSelectedTool("hand");
+          editor.setCurrentTool("hand");
           break;
         case "pen":
-          editor.setSelectedTool("draw");
+          editor.setCurrentTool("draw");
           break;
         case "text":
-          editor.setSelectedTool("text");
+          editor.setCurrentTool("text");
           break;
         case "shapes":
-          editor.setSelectedTool("geo");
+          editor.setCurrentTool("geo");
           break;
         case "eraser":
-          editor.setSelectedTool("eraser");
+          editor.setCurrentTool("eraser");
           break;
         default:
           break;
@@ -208,11 +208,8 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      editor.updateInstanceState({ 
-        stylesForNextShape: { 
-          ...editor.getInstanceState().stylesForNextShape,
-          color 
-        } 
+      editor.setStyleForNextShapes({ 
+        color 
       });
     };
     
@@ -242,7 +239,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
       if (!editor) return;
       try {
         const selectedIds = Array.from(editor.getSelectedShapeIds());
-        const allIds = editor.getShapeIds();
+        const allIds = Array.from(editor.getCurrentPageShapeIds());
         
         const svg = await editor.getSvg(selectedIds.length > 0 ? selectedIds : allIds);
           
