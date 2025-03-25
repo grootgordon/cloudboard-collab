@@ -15,16 +15,16 @@ const RoomControls = () => {
   const handleJoinRoom = () => {
     if (roomId.trim()) {
       navigate(`/whiteboard/${roomId.trim()}`);
-      toast('正在加入房间：' + roomId.trim());
+      toast.info(`Joining room: ${roomId.trim()}`);
     } else {
-      toast.error("请输入房间 ID");
+      toast.error("Please enter a room ID");
     }
   };
 
   const handleCreateRoom = () => {
     const newRoomId = Math.random().toString(36).substring(2, 10);
     navigate(`/whiteboard/${newRoomId}`);
-    toast.success(`已创建新房间：${newRoomId}`);
+    toast.success(`Created new room: ${newRoomId}`);
   };
 
   return (
