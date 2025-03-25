@@ -207,7 +207,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     // Handle color changes
     const handleColorChange = (color: string) => {
       if (!editor) return;
-      editor.setStyleForNextShapes("color", color);
+      editor.setStyleForNextShapes({ color: color });
     };
     
     // Handle undo/redo
