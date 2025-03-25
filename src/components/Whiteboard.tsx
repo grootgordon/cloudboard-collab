@@ -16,6 +16,15 @@ interface WhiteboardProps {
   roomId: string;
 }
 
+// Define the cursor data structure
+interface CursorData {
+  x: number;
+  y: number;
+  name: string;
+  color: string;
+  timestamp?: number;
+}
+
 const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [yDoc, setYDoc] = useState<Y.Doc | null>(null);
@@ -23,7 +32,7 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
   const [store, setStore] = useState<TLStore | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
   const [connectionAttempts, setConnectionAttempts] = useState(0);
-  const [cursors, setCursors] = useState<Record<string, { x: number, y: number, name: string, color: string }>>({});
+  const [cursors, setCursors] = useState<Record<string, CursorData>>({});
   
   // Initialize Yjs document and Hocuspocus provider
   useEffect(() => {
@@ -157,10 +166,11 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
     
     // Observe cursor changes
     cursorsMap.observe(() => {
-      const currentCursors: Record<string, any> = {};
+      const currentCursors: Record<string, CursorData> = {};
       cursorsMap.forEach((value, key) => {
-        if (key !== userId) { // Don't show our own cursor
-          currentCursors[key] = value;
+        const cursorData = value as CursorData;
+        if (key !== userId && cursorData) { // Don't show our own cursor
+          currentCursors[key] = cursorData;
         }
       });
       setCursors(currentCursors);
@@ -215,7 +225,8 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
         const cleanupInterval = setInterval(() => {
           const now = Date.now();
           cursorsMap.forEach((value, key) => {
-            if (value.timestamp && now - value.timestamp > 5000) {
+            const cursorData = value as CursorData;
+            if (cursorData.timestamp && now - cursorData.timestamp > 5000) {
               cursorsMap.delete(key);
             }
           });
@@ -228,7 +239,6 @@ const Whiteboard = ({ roomId }: WhiteboardProps) => {
         // Disable infinite canvas
         editor.setCamera({ x: 0, y: 0, z: 1 });
         editor.updateInstanceState({ 
-          canMoveCamera: false,
           isGridMode: true,
         });
         
