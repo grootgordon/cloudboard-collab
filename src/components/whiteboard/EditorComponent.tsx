@@ -84,7 +84,7 @@ const EditorComponent: React.FC<EditorComponentProps> = ({ provider, yDoc }) => 
       if (editor.user) {
         editor.user.updateUserPreferences({
           isSnapMode: true,
-          isToolLocked: true,  // Lock the current tool
+          // Removed isToolLocked as it doesn't exist in TLUserPreferences
         });
       }
       
